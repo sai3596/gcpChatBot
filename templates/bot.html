@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Go Cats Lets Go UC! Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #939393;
+        }
+        .chat-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .chat-header {
+            background-color: #003166;
+            color: #fff;
+            padding: 10px 20px;
+            font-size: 1.2em;
+            text-align: center;
+        }
+        .chat-messages {
+            padding: 20px;
+            overflow-y: scroll;
+            max-height: 300px;
+        }
+        .message {
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+        }
+        .message.user {
+            /* background-color: #007bff; */
+            color: #000;
+            align-self: flex-end;
+        }
+        .message.bot {
+            /* background-color: #2D6930; */
+            color: #000;
+        }
+        .chat-input {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .chat-input input {
+            flex: 1;
+            padding: 8px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .chat-input button {
+            padding: 10px 20px;
+            background-color: #10421B;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #endChat {
+            display: block;
+            align-items: center;
+            padding: 10px 20px; /* Same padding as the Send button */
+            margin: 20px auto;
+            background-color: #C62F3E; /* Red color */
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .message.bot.fixed {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background-color: #8AC3A4;
+            border-bottom: 1px solid #ccc;
+            padding: 8px 12px;
+        }
+        .message.bot.suggested{
+            color:#562C02;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">College Inquiry Chatbot</div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input">
+            <input type="text" id="userInput" placeholder="Type your message...">
+            <button id="sendMessage">Send</button>
+        </div>
+    </div>
+    <button id="endChat">End Chat</button> <!-- Added End Chat button -->
+
+    <script>
+        var chatMessages = document.getElementById('chatMessages');
+        var userInput = document.getElementById('userInput');
+        var sendMessageButton = document.getElementById('sendMessage');
+        var endChatButton = document.getElementById('endChat'); // Added
+
+        function addMessage(message, sender) {
+            var messageClass = sender === 'user' ? 'user' : 'bot';
+            var messageElement = document.createElement('div');
+            messageElement.classList.add('message', messageClass);
+            messageElement.textContent = message;
+
+
+            // Check if the message is one of the first four suggested questions
+            if (sender === 'bot' && document.querySelectorAll('.message.bot.suggested').length <= `{{questions|length+1}}`) {
+                messageElement.classList.add('suggested');
+            }
+
+            if (sender === 'bot' && document.querySelectorAll('.message.bot.suggested').length <= `{{questions|length+1}}`) {
+                messageElement.addEventListener('click', function() {
+                    sendQuestion(message);
+                });
+                if(!(message === "Welcome! How can I help you today?" || message === "Here are some suggested questions:")){
+                    messageElement.style.cursor = 'pointer';
+                }
+            }
+            var senderNameStyle = sender === 'user' ? 'color: #007bff;' : 'color: #4caf50;';
+            // Display user and bot names
+            if (sender === 'user') {
+                messageElement.innerHTML = '<strong style="' + senderNameStyle + '">You</strong>' + '<br>' + message;
+            } else {
+                if(document.querySelectorAll('.message.bot.suggested').length > `{{questions|length+1}}`){
+                    messageElement.innerHTML = '<strong style="' + senderNameStyle + '">ChatBot</strong>' + '<br>' + message;
+                }
+            }
+
+            chatMessages.appendChild(messageElement);
+            // var breakElement = document.createElement('br');
+            // chatMessages.appendChild(breakElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Scroll to bottom only if the message is not one of the first four suggested questions
+            /*
+            if (!messageElement.classList.contains('fixed')) {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            */
+        }
+
+
+
+        function sendQuestion(question) {
+            addMessage(question, 'user');
+            fetch('/answers', {
+                method: 'POST',
+                body: JSON.stringify({ questions: [question] }),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                var botResponse = data[0] || "I'm sorry, I don't have an answer for that question.";
+                addMessage(botResponse, 'bot');
+            });
+        }
+
+        sendMessageButton.addEventListener('click', function() {
+            var userMessage = userInput.value.trim();
+            if (userMessage === '') return;
+            addMessage(userMessage, 'user');
+            userInput.value = '';
+
+            // Send the message to the server
+            fetch('/answers', {
+                method: 'POST',
+                body: JSON.stringify({ questions: [userMessage] }),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                var botResponse = data[0] || "I'm sorry, I don't have an answer for that question. If you have any question from the above list, please type full question as mentioned above";
+                addMessage(botResponse, 'bot');
+            });
+        });
+
+        userInput.addEventListener('keydown', function(event) {
+            if (event.keyCode === 13) {
+                event.preventDefault();
+                sendMessageButton.click();
+            }
+        });
+
+        endChatButton.addEventListener('click', function() {
+            // Implement logic to end the chat (e.g., redirect to an end page)
+            var firstName = "{{ user_first_name }}";
+            var lastName = "{{ user_last_name }}";
+            var email = "{{ user_email }}";
+            window.location.href = '/end_chat?first_name=' + firstName + '&last_name=' + lastName + '&email=' + email;
+        });
+
+<!--        // Initial welcome message-->
+<!--        addMessage('Welcome! How can I help you today?', 'bot');-->
+
+<!--        // Suggested questions-->
+<!--        addMessage('Here are some suggested questions:', 'bot');-->
+
+        `{% for question in questions %}`
+        addMessage("{{question}}", 'bot');
+        `{% endfor %}`
+
+    </script>
+</body>
+</html>
